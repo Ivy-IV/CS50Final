@@ -8,8 +8,9 @@ from tkinter import *
 from tkinter import filedialog
 import sqlite3 as sql
 from helper import search
+from pathlib import Path
 
-conn = sql.connect('launch.db')
+conn = sql.connect('launcher.db')
 db = conn.cursor()
 
 root = Tk()
@@ -34,13 +35,25 @@ def scanWindow():
     pathEntry = Entry(scan, width=50)
     pathEntry.grid(column=1, row=0)
 
+    def getList(path):
+        games = search(path)
+        print(games)
+        addList = Listbox(scan, selectmode=MULTIPLE)
+        addList.grid(column=0, row=2)
+        for item in games:
+            print(item)
+            i = item.parent + "/" + item.stem
+            print(i)
+            addList.insert(END, i)
+
     # !!!BUTTONS!!!
     pathButton = Button(scan, text="Folder", command=lambda: folderPath(pathEntry))
     pathButton.grid(column=0, row=0)
-    pathString = pathEntry.get()
 
-    scanButton = Button(scan, text="Find Games!", command=lambda: search(pathString))
+    scanButton = Button(scan, text="Find Games!", command=lambda: getList(pathEntry.get()))
     scanButton.grid(column=1, row=1)
+
+
 
 # !!!MENUS!!!
 menuBar = Menu(root)
