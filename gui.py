@@ -30,28 +30,38 @@ def scanWindow():
     scan = Toplevel(root)
     scan.title("Scan Folder")
     scan.geometry("400x600")
+    scan.grid_columnconfigure(index=0, weight=1)
+    scan.grid_columnconfigure(index=1, weight=1)
     scan.grab_set()
     # !!!ENTRIES!!!
     pathEntry = Entry(scan, width=50)
-    pathEntry.grid(column=1, row=0)
+    pathEntry.grid(column=1, row=0, sticky=W)
 
     def getList(path):
         games = search(path)
-        print(games)
-        addList = Listbox(scan, selectmode=MULTIPLE)
-        addList.grid(column=0, row=2)
         for item in games:
-            print(item)
-            i = item.parent + "/" + item.stem
-            print(i)
-            addList.insert(END, i)
+            addList.insert(END, item)
+        addList.grid(columnspan=2, row=2, sticky=EW+NS,)
+        scrolly.grid(column=2, row=2, sticky=NS)
+        scrollx.grid(columnspan=2, row=3, sticky=EW)
+        addButton.grid(column=1, row=5)
 
+    # !!!LIST!!!
+    scrolly = Scrollbar(scan)
+    scrollx = Scrollbar(scan, orient=HORIZONTAL)
+    addList = Listbox(scan, selectmode=MULTIPLE,
+    yscrollcommand=scrolly.set, xscrollcommand=scrollx.set)
+    scrolly.config(command=addList.yview)
+    scrollx.config(command=addList.xview)
     # !!!BUTTONS!!!
     pathButton = Button(scan, text="Folder", command=lambda: folderPath(pathEntry))
     pathButton.grid(column=0, row=0)
 
     scanButton = Button(scan, text="Find Games!", command=lambda: getList(pathEntry.get()))
     scanButton.grid(column=1, row=1)
+
+    addButton = Button(scan, text="Add to Games")
+
 
 
 
