@@ -40,12 +40,17 @@ def scanWindow():
     def getList(path):
         games = search(path)
         for item in games:
-            addList.insert(END, item)
+            if Path(item) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, item)
         addList.grid(columnspan=2, row=2, sticky=EW+NS,)
         scrolly.grid(column=2, row=2, sticky=NS)
         scrollx.grid(columnspan=2, row=3, sticky=EW)
         addButton.grid(column=1, row=5)
 
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!! 
+    def addGame():
+        select = addList.curselection()
+        for i in select:
+            path = addList.get(i)
     # !!!LIST!!!
     scrolly = Scrollbar(scan)
     scrollx = Scrollbar(scan, orient=HORIZONTAL)
@@ -60,7 +65,7 @@ def scanWindow():
     scanButton = Button(scan, text="Find Games!", command=lambda: getList(pathEntry.get()))
     scanButton.grid(column=1, row=1)
 
-    addButton = Button(scan, text="Add to Games")
+    addButton = Button(scan, text="Add to Games", command=addGame)
 
 
 
