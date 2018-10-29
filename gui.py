@@ -46,11 +46,20 @@ def scanWindow():
         scrollx.grid(columnspan=2, row=3, sticky=EW)
         addButton.grid(column=1, row=5)
 
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!! 
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!!
     def addGame():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
+            rows = db.execute("SELECT path FROM noDRM WHERE path=?", (path,))
+            print(rows)
+            # Returns generator object --- need to use result in condition
+            if rows:
+                db.execute()
+                rows = db.execute("INSERT INTO noDRM('name', 'path') VALUES(?, ?)",
+                    Path(path).stem, path)
+                print(rows)
+
     # !!!LIST!!!
     scrolly = Scrollbar(scan)
     scrollx = Scrollbar(scan, orient=HORIZONTAL)
