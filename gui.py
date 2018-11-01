@@ -6,11 +6,11 @@ automatically log in to Steam as needed.
 
 from tkinter import *
 from tkinter import filedialog
-import sqlite3 as sql
+from sqlite3 import *
 from helper import search
 from pathlib import Path
 
-conn = sql.connect('launcher.db')
+conn = connect('launcher.db')
 db = conn.cursor()
 
 root = Tk()
@@ -21,10 +21,6 @@ root.geometry("800x600")
 
 # !!!FUNCTIONS!!!
 """ Get folder location"""
-def folderPath(entry):
-    path = filedialog.askdirectory()
-    entry.delete(0, END)
-    entry.insert(0, path)
 
 def scanWindow():
     scan = Toplevel(root)
@@ -33,11 +29,9 @@ def scanWindow():
     scan.grid_columnconfigure(index=0, weight=1)
     scan.grid_columnconfigure(index=1, weight=1)
     scan.grab_set()
-    # !!!ENTRIES!!!
-    pathEntry = Entry(scan, width=50)
-    pathEntry.grid(column=1, row=0, sticky=W)
 
-    def getList(path):
+    def getList():
+        path = filedialog.askdirectory()
         games = search(path)
         for item in games:
             if Path(item) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, item)
@@ -51,14 +45,15 @@ def scanWindow():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
+            print(path)
             rows = db.execute("SELECT path FROM noDRM WHERE path=?", (path,))
-            print(rows)
+            print(rows.fetchall())
             # Returns generator object --- need to use result in condition
-            if rows:
-                db.execute()
+            if rows.fetchall() == []:
                 rows = db.execute("INSERT INTO noDRM('name', 'path') VALUES(?, ?)",
-                    Path(path).stem, path)
-                print(rows)
+                    (Path(path).stem, path,))
+                print(rows.fetchall())
+        conn.commit()
 
     # !!!LIST!!!
     scrolly = Scrollbar(scan)
@@ -68,11 +63,8 @@ def scanWindow():
     scrolly.config(command=addList.yview)
     scrollx.config(command=addList.xview)
     # !!!BUTTONS!!!
-    pathButton = Button(scan, text="Folder", command=lambda: folderPath(pathEntry))
+    pathButton = Button(scan, text="Folder", command=getList)
     pathButton.grid(column=0, row=0)
-
-    scanButton = Button(scan, text="Find Games!", command=lambda: getList(pathEntry.get()))
-    scanButton.grid(column=1, row=1)
 
     addButton = Button(scan, text="Add to Games", command=addGame)
 
