@@ -9,7 +9,9 @@ from tkinter import filedialog
 from sqlite3 import *
 from helper import search
 from pathlib import Path
-from subprocess import Popen
+from subprocess import Popen, check_output, run
+
+steamLog = False;
 
 conn = connect('launcher.db')
 db = conn.cursor()
@@ -95,14 +97,44 @@ def scanWindow():
 
     addButton = Button(scan, text="Add to Games", command=addGame)
 
+def steamWindow():
+    steam = Toplevel(root)
+    steam.title("Add Steam Games")
+    steam.geometry("300x94")
+    steam.grid_columnconfigure(index=1, weight=1)
+    steam.grab_set()
+
+    def steamUpdate():
+        print("TODO")
+
+    labelUser = Label(steam, text="Username").grid(column=0, row=0)
+    enterUser = Entry(steam).grid(column = 1, row=0, sticky=EW)
+    labelPass = Label(steam, text="Password").grid(column=0, row=1)
+    enterPass = Entry(steam, show='*').grid(column = 1, row=1, sticky=EW)
+    steamButton = Button(steam, text="Update Steam List").grid(column=1, row=2)
+    okButton = Button(steam, text="OK", width=10, command=steamUpdate).grid(column=1, row=10, sticky=SE)
+    cancelButton = Button(steam, text="OK", width=10).grid(column=0, row=10, sticky=SE)
+
+
 def runGame():
     index = gameList.curselection()
     runPath = gameList.get(index)[1]
-    Popen(runPath)
+    rows = db.execute("SELECT drm FROM games WHERE path=?", (runPath,))
+    if rows.fetchone() == "(Steam,)":
+        # Check if Steam is running - found via:
+        # https://stackoverflow.com/questions/25545937/check-if-process-is-running-in-windows-using-only-python-built-in-modules
+        if steamLog == False:
+            steamCheck = check_output('tasklist', shell=True)
+            if steamCheck == false:
+                try: run(steamPath, "-login", steamUser, steamPass)
+                except: print("Login failed! oopsy")
+
+    elif rows.fetchall() == "(None,)": Popen(runPath)
 
 # !!!MENUS!!!
 menuBar = Menu(root)
-menuBar.add_command(label="Scan", command=scanWindow)
+menuBar.add_command(label="Scan Folder", command=scanWindow)
+menuBar.add_command(label="Steam", command=steamWindow)
 # Add menu to root window
 root.config(menu=menuBar)
 

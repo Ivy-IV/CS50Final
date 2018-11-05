@@ -8,3 +8,7 @@ def search(path):
     joff = jeff.glob('**/*.exe')
 
     return joff
+
+def steamSearch():
+    """ Get list of all Steam games and add them to a table in launcher.db """
+    print("TODO")
