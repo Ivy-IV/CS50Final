@@ -7,7 +7,7 @@ automatically log in to Steam as needed.
 from tkinter import *
 from tkinter import filedialog
 from sqlite3 import *
-from helper import search
+from helper import *
 from pathlib import Path
 from subprocess import Popen, check_output, run
 
@@ -17,7 +17,7 @@ conn = connect('launcher.db')
 db = conn.cursor()
 
 root = Tk()
-root.title("Ivy's Game Launcher")
+root.title("IVyVI Game Launcher")
 root.geometry("800x600")
 root.grid_columnconfigure(index=0, weight=1)
 root.grid_rowconfigure(index=0, weight=1)
@@ -105,15 +105,16 @@ def steamWindow():
     steam.grab_set()
 
     def steamUpdate():
+        steamGetList()
         print("TODO")
 
     labelUser = Label(steam, text="Username").grid(column=0, row=0)
     enterUser = Entry(steam).grid(column = 1, row=0, sticky=EW)
     labelPass = Label(steam, text="Password").grid(column=0, row=1)
     enterPass = Entry(steam, show='*').grid(column = 1, row=1, sticky=EW)
-    steamButton = Button(steam, text="Update Steam List").grid(column=1, row=2)
-    okButton = Button(steam, text="OK", width=10, command=steamUpdate).grid(column=1, row=10, sticky=SE)
-    cancelButton = Button(steam, text="OK", width=10).grid(column=0, row=10, sticky=SE)
+    steamButton = Button(steam, text="Update Steam List", command=steamUpdate).grid(column=1, row=2)
+    okButton = Button(steam, text="OK", width=10).grid(column=1, row=10, sticky=SE)
+    cancelButton = Button(steam, text="Cancel", width=10).grid(column=0, row=10, sticky=SE)
 
 
 def runGame():
