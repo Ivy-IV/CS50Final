@@ -61,6 +61,7 @@ def scanWindow():
             for item in games:
                 if Path(item) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, item)
         addButton.grid(column=5, row=5, sticky=SE)
+        return True
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!!
     def addGame():
@@ -77,6 +78,7 @@ def scanWindow():
                 print(rows.fetchall())
         conn.commit()
         update()
+        return True
 
     # !!!LIST!!!
     scrolly = Scrollbar(scan)
@@ -100,37 +102,70 @@ def scanWindow():
 def steamWindow():
     steam = Toplevel(root)
     steam.title("Add Steam Games")
-    steam.geometry("300x94")
+    steam.geometry("300x100")
     steam.grid_columnconfigure(index=1, weight=1)
+    steam.grid_rowconfigure(index=9, weight=1)
     steam.grab_set()
 
-    def steamUpdate():
-        steamGetList()
-        print("TODO")
+    def steamDir(command):
+        if command == "add":
+            path = filedialog.askdirectory()
+            if path not in [i for i in steamDirList.get(0, END)]:
+                steamDirList.insert(END, path)
+                return True
+            else: return False
+        elif command == "remove":
+            select = steamDirList.curselection()
+            for i in select:
+                steamDirList.delete(i)
+            return True
+
+    #!!!!!LIST!!!!!
+    steamScry = Scrollbar(steam)
+    steamScry.grid(column=3, row=2, sticky=NS)
+    steamScrx = Scrollbar(steam, orient=HORIZONTAL)
+    steamScrx.grid(column=1, columnspan=2, row=3, sticky=EW)
+    steamDirList = Listbox(steam, selectmode=MULTIPLE, height=5,
+    yscrollcommand=steamScry.set, xscrollcommand=steamScrx.set)
+    steamDirList.grid(column=1, columnspan=2, row=2, sticky=EW+NS,)
+    steamScry.config(command=steamDirList.yview)
+    steamScrx.config(command=steamDirList.xview)
 
     labelUser = Label(steam, text="Username").grid(column=0, row=0)
-    enterUser = Entry(steam).grid(column = 1, row=0, sticky=EW)
+    enterUser = Entry(steam).grid(column=1, row=0, sticky=EW)
     labelPass = Label(steam, text="Password").grid(column=0, row=1)
-    enterPass = Entry(steam, show='*').grid(column = 1, row=1, sticky=EW)
-    steamButton = Button(steam, text="Update Steam List", command=steamUpdate).grid(column=1, row=2)
+    enterPass = Entry(steam, show='*').grid(column=1, row=1, sticky=N+EW)
+    dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:steamDir("add"))
+    dirAddButton.grid(row=2, sticky=NE)
+    dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:steamDir("remove"))
+    dirRemButton.grid(row=2)
+    steamButton = Button(steam, text="Update Steam List", command=lambda:steamSearch(steamDirList.get(0,END)))
     okButton = Button(steam, text="OK", width=10).grid(column=1, row=10, sticky=SE)
     cancelButton = Button(steam, text="Cancel", width=10).grid(column=0, row=10, sticky=SE)
 
 
 def runGame():
     index = gameList.curselection()
-    runPath = gameList.get(index)[1]
-    rows = db.execute("SELECT drm FROM games WHERE path=?", (runPath,))
-    if rows.fetchone() == "(Steam,)":
+    runName = gameList.get(index)[0]
+    rows = db.execute("SELECT drm, path, steamid FROM games WHERE path=?", (runName,))
+    gameInfo = rows.fetchone()
+    if gameInfo[0] == "(Steam,)":
         # Check if Steam is running - found via:
         # https://stackoverflow.com/questions/25545937/check-if-process-is-running-in-windows-using-only-python-built-in-modules
         if steamLog == False:
             steamCheck = check_output('tasklist', shell=True)
-            if steamCheck == false:
+            # TO FINISH
+            if steamCheck == False:
                 try: run(steamPath, "-login", steamUser, steamPass)
-                except: print("Login failed! oopsy")
+                except:
+                    print("Login failed! oopsy")
+                    return False
+        try: run(steamPath, "-applaunch", gameInfo[2])
+        except:
+            print("Couldn't launch Steam game! oh no")
+            return False
 
-    elif rows.fetchall() == "(None,)": Popen(runPath)
+    elif gameInfo[0] == "(None,)": Popen(gameInfo[1])
 
 # !!!MENUS!!!
 menuBar = Menu(root)
