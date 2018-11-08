@@ -36,10 +36,10 @@ gScrollx.config(command=gameList.xview)
 # !!!FUNCTIONS!!!
 def update():
     gameList.delete(0, END)
-    rows = db.execute("SELECT name, path FROM games ORDER BY drm, name")
+    rows = db.execute("SELECT name, path, drm FROM games ORDER BY drm, name")
     for i in rows:
-        print(i)
-        game = i[0], i[1]
+        if i[2] == "No DRM": game = i[0], i[1]
+        elif i[2] == "Steam": game = i[0], i[2]
         gameList.insert(END, game)
 
 def scanWindow():
@@ -64,18 +64,16 @@ def scanWindow():
         return True
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!!
-    def addGame():
+    def addNoDRM():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
-            print(path)
+            noDInfo = [Path(path).stem, path, "No DRM",]
             rows = db.execute("SELECT path FROM games WHERE path=?", (path,))
-            print(rows.fetchall())
             # Returns generator object --- need to use result in condition
             if path not in rows.fetchall():
-                rows = db.execute("INSERT INTO games('name', 'path') VALUES(?, ?)",
-                    (Path(path).stem, path,))
-                print(rows.fetchall())
+                rows = db.execute("INSERT OR REPLACE INTO games('name', 'path', drm) VALUES(?, ?, ?)",
+                    noDInfo)
         conn.commit()
         update()
         return True
@@ -97,12 +95,12 @@ def scanWindow():
     folderButton = Button(scan, text="Scan Folder", command=lambda: getList(1))
     folderButton.grid(column=0, row=1, sticky=N+EW)
 
-    addButton = Button(scan, text="Add to Games", command=addGame)
+    addButton = Button(scan, text="Add to Games", command=addNoDRM)
 
 def steamWindow():
     steam = Toplevel(root)
     steam.title("Add Steam Games")
-    steam.geometry("300x100")
+    steam.geometry("300x300")
     steam.grid_columnconfigure(index=1, weight=1)
     steam.grid_rowconfigure(index=9, weight=1)
     steam.grab_set()
@@ -119,6 +117,23 @@ def steamWindow():
             for i in select:
                 steamDirList.delete(i)
             return True
+
+    def steamAdd():
+        sList = steamSearch(steamDirList.get(0,END))
+        for i in sList:
+            rows = db.execute("SELECT steamid FROM games WHERE steamid=?", (i[0],))
+            if i[0] not in rows.fetchall():
+                ins = db.execute("INSERT OR REPLACE INTO games(steamid, name, drm) VALUES(?, ?, ?)", i)
+        return True
+
+
+    def steamQuit(command):
+        if command == "ok":
+            conn.commit()
+            update()
+        elif command == "cancel":
+            conn.rollback()
+        steam.destroy()
 
     #!!!!!LIST!!!!!
     steamScry = Scrollbar(steam)
@@ -139,9 +154,12 @@ def steamWindow():
     dirAddButton.grid(row=2, sticky=NE)
     dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:steamDir("remove"))
     dirRemButton.grid(row=2)
-    steamButton = Button(steam, text="Update Steam List", command=lambda:steamSearch(steamDirList.get(0,END)))
-    okButton = Button(steam, text="OK", width=10).grid(column=1, row=10, sticky=SE)
-    cancelButton = Button(steam, text="Cancel", width=10).grid(column=0, row=10, sticky=SE)
+    steamButton = Button(steam, text="Update Steam List", command=steamAdd)
+    steamButton.grid(column=1, row=4)
+    okButton = Button(steam, text="OK", width=10, command=lambda: steamQuit("ok"))
+    okButton.grid(column=1, row=10, sticky=SE)
+    cancelButton = Button(steam, text="Cancel", width=10, command=lambda: steamQuit("cancel"))
+    cancelButton.grid(column=0, row=10, sticky=SE)
 
 
 def runGame():

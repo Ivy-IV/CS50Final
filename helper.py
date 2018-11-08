@@ -18,15 +18,20 @@ def search(path):
 def steamSearch(dirPaths):
     """Search Steam folders for list of installed apps, return their names and IDs"""
     for i in dirPaths:
+        sL = []
         iPath = Path(i)
-        appsPath = iPath.glob('/steamapps/*.acf')
+        appsPath = iPath.glob('steamapps/*.acf')
         for j in appsPath:
-            with open(j, r) as k:
-                k.read()
-                json.dumps(k)
-                print(k)
-
-    return ("TODO")
+            with open(j) as k:
+                acfFile = ""
+                while "appid" not in acfFile:
+                    acfFile = k.readline()
+                sAppID = acfFile.replace('\"appid\"', '').strip('\n\t\" ')
+                while "name" not in acfFile:
+                    acfFile = k.readline()
+                sName = acfFile.replace('\"name\"', '').strip('\n\t\" ')
+            sL.append((sAppID, sName, "Steam"))
+    return sL
 
 def steamGetList():
     """ Get list of all Steam games and add them to a table in launcher.db """
