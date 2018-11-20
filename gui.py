@@ -12,7 +12,7 @@ from pathlib import Path
 from subprocess import Popen, check_output, run
 
 steamLog = False;
-
+steamUser = ""
 conn = connect('launcher.db')
 db = conn.cursor()
 
@@ -20,27 +20,60 @@ root = Tk()
 root.title("IVyVI Game Launcher")
 root.geometry("800x600")
 root.grid_columnconfigure(index=0, weight=1)
+root.grid_columnconfigure(index=2, weight=1)
 root.grid_rowconfigure(index=0, weight=1)
 
-# !!!GAME LIST!!!
-gScrolly = Scrollbar(root)
-gScrolly.grid(column=3, rowspan=3, sticky=NS)
-gScrollx = Scrollbar(root, orient=HORIZONTAL)
-gScrollx.grid(columnspan=3, row=3, sticky=EW)
-gameList = Listbox(root, selectmode=SINGLE,
-yscrollcommand=gScrolly.set, xscrollcommand=gScrollx.set)
-gameList.grid(columnspan=3, row=0, rowspan=3, sticky=EW+NS,)
-gScrolly.config(command=gameList.yview)
-gScrollx.config(command=gameList.xview)
+
+# !!!GAME LISTS!!!
+ndLabel = Label(root, text="No DRM")
+ndScrolly = Scrollbar(root)
+ndScrolly.grid(column=1, row=0, sticky=NS + W)
+ndScrollx = Scrollbar(root, orient=HORIZONTAL)
+ndScrollx.grid(column=0, row=1, sticky=EW)
+noDrmList = Listbox(root, selectmode=SINGLE,
+yscrollcommand=ndScrolly.set, xscrollcommand=ndScrollx.set)
+noDrmList.grid(column=0, row=0, sticky=EW+NS,)
+ndScrolly.config(command=noDrmList.yview)
+ndScrollx.config(command=noDrmList.xview)
+
+stLabel = Label (root, text="Steam")
+stScrolly = Scrollbar(root)
+stScrolly.grid(column=3, row=0, sticky=NS)
+stScrollx = Scrollbar(root, orient=HORIZONTAL)
+stScrollx.grid(column=2, row=1, sticky=EW)
+steamList = Listbox(root, selectmode=SINGLE,
+yscrollcommand=stScrolly.set, xscrollcommand=stScrollx.set)
+steamList.grid(column=2, row=0, sticky=EW+NS,)
+stScrolly.config(command=steamList.yview)
+stScrollx.config(command=steamList.xview)
 
 # !!!FUNCTIONS!!!
 def update():
-    gameList.delete(0, END)
-    rows = db.execute("SELECT name, path, drm FROM games ORDER BY drm, name")
+    noDrmList.delete(0, END)
+    rows = db.execute("SELECT name, path FROM nodrm ORDER BY name")
     for i in rows:
-        if i[2] == "No DRM": game = i[0], i[1]
-        elif i[2] == "Steam": game = i[0], i[2]
-        gameList.insert(END, game)
+        game = i[0], i[1]
+        noDrmList.insert(END, game)
+    steamList.delete(0, END)
+    rows = db.execute("SELECT name, appid FROM steam ORDER BY name")
+    for i in rows:
+        game = i[0]
+        steamList.insert(END, game)
+    if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
+    else: runButton.config(state=DISABLED)
+
+def listEdit(command, list):
+    if command == "add":
+        path = filedialog.askdirectory()
+        if path not in [i for i in list.get(0, END)]:
+            list.insert(END, path)
+            return True
+        else: return False
+    elif command == "remove":
+        select = list.curselection()
+        for i in select:
+            list.delete(i)
+        return True
 
 def scanWindow():
     scan = Toplevel(root)
@@ -68,11 +101,11 @@ def scanWindow():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
-            noDInfo = [Path(path).stem, path, "No DRM",]
-            rows = db.execute("SELECT path FROM games WHERE path=?", (path,))
+            noDInfo = [Path(path).stem, path]
+            rows = db.execute("SELECT path FROM nodrm WHERE path=?", (path,))
             # Returns generator object --- need to use result in condition
             if path not in rows.fetchall():
-                rows = db.execute("INSERT OR REPLACE INTO games('name', 'path', drm) VALUES(?, ?, ?)",
+                rows = db.execute("INSERT OR REPLACE INTO nodrm('name', 'path') VALUES(?, ?)",
                     noDInfo)
         conn.commit()
         update()
@@ -105,25 +138,18 @@ def steamWindow():
     steam.grid_rowconfigure(index=9, weight=1)
     steam.grab_set()
 
-    def steamDir(command):
-        if command == "add":
-            path = filedialog.askdirectory()
-            if path not in [i for i in steamDirList.get(0, END)]:
-                steamDirList.insert(END, path)
-                return True
-            else: return False
-        elif command == "remove":
-            select = steamDirList.curselection()
-            for i in select:
-                steamDirList.delete(i)
-            return True
+    def userAdd():
+        user = Toplevel(steam)
+        labelUser = Label(steam, text="Username:").grid(column=0, row=0)
+        enterUser = Entry(steam).grid(column=1, row=0, sticky=EW)
+    userLabel = Label(steam, text="Username: " + steamUser)
 
     def steamAdd():
         sList = steamSearch(steamDirList.get(0,END))
         for i in sList:
-            rows = db.execute("SELECT steamid FROM games WHERE steamid=?", (i[0],))
+            rows = db.execute("SELECT appid FROM steam WHERE appid=?", (i[0],))
             if i[0] not in rows.fetchall():
-                ins = db.execute("INSERT OR REPLACE INTO games(steamid, name, drm) VALUES(?, ?, ?)", i)
+                ins = db.execute("INSERT OR REPLACE INTO steam(appid, name) VALUES(?, ?)", i)
         return True
 
 
@@ -146,13 +172,11 @@ def steamWindow():
     steamScry.config(command=steamDirList.yview)
     steamScrx.config(command=steamDirList.xview)
 
-    labelUser = Label(steam, text="Username").grid(column=0, row=0)
-    enterUser = Entry(steam).grid(column=1, row=0, sticky=EW)
-    labelPass = Label(steam, text="Password").grid(column=0, row=1)
-    enterPass = Entry(steam, show='*').grid(column=1, row=1, sticky=N+EW)
-    dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:steamDir("add"))
+
+
+    dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
     dirAddButton.grid(row=2, sticky=NE)
-    dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:steamDir("remove"))
+    dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
     dirRemButton.grid(row=2)
     steamButton = Button(steam, text="Update Steam List", command=steamAdd)
     steamButton.grid(column=1, row=4)
@@ -165,19 +189,33 @@ def steamWindow():
 def runGame():
     index = gameList.curselection()
     runName = gameList.get(index)[0]
-    rows = db.execute("SELECT drm, path, steamid FROM games WHERE path=?", (runName,))
+    print(runName)
+    rows = db.execute("SELECT drm, path, appid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
-    if gameInfo[0] == "(Steam,)":
+    if gameInfo[0] == "Steam":
         # Check if Steam is running - found via:
         # https://stackoverflow.com/questions/25545937/check-if-process-is-running-in-windows-using-only-python-built-in-modules
+        """ !!!!!!!Maybe to be abandoned!!!!!!!
+
         if steamLog == False:
-            steamCheck = check_output('tasklist', shell=True)
-            # TO FINISH
+            checkNo = 0
+            steamCheck = Popen('tasklist', shell=True).strip().split('\n')
+            for line in steamCheck:
+                if "steamwebhelper.exe" in line: checkNo += 1
+            print(steamCheck)
+            return False
+            if checkNo =>3:
+                steamCheck = True
+                steamLog = True
+            else: steamCheck = False
             if steamCheck == False:
                 try: run(steamPath, "-login", steamUser, steamPass)
                 except:
                     print("Login failed! oopsy")
                     return False
+            steamLog = True
+            """
+
         try: run(steamPath, "-applaunch", gameInfo[2])
         except:
             print("Couldn't launch Steam game! oh no")
@@ -194,9 +232,13 @@ root.config(menu=menuBar)
 
 
 
-# !!!BUTTON!!!
-runButton = Button(root, text="Run", command=runGame)
+# !!!BUTTONS!!!
+runButton = Button(root, text="Run", command=runGame, height=2, width=15)
 runButton.grid(column=0, row=10, sticky=S+W)
+if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
+else: runButton.config(state=DISABLED)
+mainRemButton = Button(root, text="Remove From List", command=lambda:listEdit("remove", gameList))
+mainRemButton.grid(column=1, row=10, sticky=W)
 
 update()
 root.mainloop()

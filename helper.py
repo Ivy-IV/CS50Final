@@ -30,7 +30,7 @@ def steamSearch(dirPaths):
                 while "name" not in acfFile:
                     acfFile = k.readline()
                 sName = acfFile.replace('\"name\"', '').strip('\n\t\" ')
-            sL.append((sAppID, sName, "Steam"))
+            sL.append((sAppID, sName))
     return sL
 
 def steamGetList():
