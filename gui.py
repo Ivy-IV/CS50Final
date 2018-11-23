@@ -10,6 +10,7 @@ from sqlite3 import *
 from helper import *
 from pathlib import Path
 from subprocess import Popen, check_output, run
+import keyring
 
 steamLog = False;
 steamUser = ""
@@ -50,15 +51,13 @@ stScrollx.config(command=steamList.xview)
 # !!!FUNCTIONS!!!
 def update():
     noDrmList.delete(0, END)
-    rows = db.execute("SELECT name, path FROM nodrm ORDER BY name")
+    rows = db.execute("SELECT * FROM games ORDER BY name")
     for i in rows:
-        game = i[0], i[1]
-        noDrmList.insert(END, game)
-    steamList.delete(0, END)
-    rows = db.execute("SELECT name, appid FROM steam ORDER BY name")
-    for i in rows:
-        game = i[0]
-        steamList.insert(END, game)
+        if i[1] == 'none':
+            game = i[0], i[2]
+            noDrmList.insert(END, game)
+        elif i[1] == 'steam':
+            steamList.insert(END, i[0])
     if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
     else: runButton.config(state=DISABLED)
 
@@ -74,6 +73,15 @@ def listEdit(command, list):
         for i in select:
             list.delete(i)
         return True
+
+def gameDelete(list):
+    select = list.curselection()
+    for i in select:
+        j = list.get(i)
+        list.delete(i)
+        rows = db.execute("DELETE FROM games WHERE pathid=?", (j[1],))
+        conn.commit()
+    return True
 
 def scanWindow():
     scan = Toplevel(root)
@@ -101,11 +109,11 @@ def scanWindow():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
-            noDInfo = [Path(path).stem, path]
-            rows = db.execute("SELECT path FROM nodrm WHERE path=?", (path,))
+            noDInfo = [Path(path).stem, path, 'none',]
+            rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (path,))
             # Returns generator object --- need to use result in condition
             if path not in rows.fetchall():
-                rows = db.execute("INSERT OR REPLACE INTO nodrm('name', 'path') VALUES(?, ?)",
+                rows = db.execute("INSERT OR REPLACE INTO games('name', 'pathid', drm) VALUES(?, ?, ?)",
                     noDInfo)
         conn.commit()
         update()
@@ -147,14 +155,15 @@ def steamWindow():
     def steamAdd():
         sList = steamSearch(steamDirList.get(0,END))
         for i in sList:
-            rows = db.execute("SELECT appid FROM steam WHERE appid=?", (i[0],))
+            rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (i[0],))
             if i[0] not in rows.fetchall():
-                ins = db.execute("INSERT OR REPLACE INTO steam(appid, name) VALUES(?, ?)", i)
+                ins = db.execute("INSERT OR REPLACE INTO games(pathid, name, drm) VALUES(?, ?, ?)", i)
         return True
 
 
     def steamQuit(command):
         if command == "ok":
+            steamAdd()
             conn.commit()
             update()
         elif command == "cancel":
@@ -186,17 +195,16 @@ def steamWindow():
     cancelButton.grid(column=0, row=10, sticky=SE)
 
 
-def runGame():
-    index = gameList.curselection()
-    runName = gameList.get(index)[0]
+def runGame(list):
+    index = list.curselection()
+    runName = list.get(index)[0]
     print(runName)
-    rows = db.execute("SELECT drm, path, appid FROM games WHERE name=?", (runName,))
+    rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
-    if gameInfo[0] == "Steam":
+    if gameInfo[0] == "(steam,)":
         # Check if Steam is running - found via:
         # https://stackoverflow.com/questions/25545937/check-if-process-is-running-in-windows-using-only-python-built-in-modules
         """ !!!!!!!Maybe to be abandoned!!!!!!!
-
         if steamLog == False:
             checkNo = 0
             steamCheck = Popen('tasklist', shell=True).strip().split('\n')
@@ -204,7 +212,7 @@ def runGame():
                 if "steamwebhelper.exe" in line: checkNo += 1
             print(steamCheck)
             return False
-            if checkNo =>3:
+            if checkNo => 3:
                 steamCheck = True
                 steamLog = True
             else: steamCheck = False
@@ -221,7 +229,7 @@ def runGame():
             print("Couldn't launch Steam game! oh no")
             return False
 
-    elif gameInfo[0] == "(None,)": Popen(gameInfo[1])
+    elif gameInfo[0] == "(none,)": Popen(gameInfo[1])
 
 # !!!MENUS!!!
 menuBar = Menu(root)
@@ -230,14 +238,19 @@ menuBar.add_command(label="Steam", command=steamWindow)
 # Add menu to root window
 root.config(menu=menuBar)
 
-
+def listSelect(event):
+    runButton.config(command=lambda:runGame(event.widget))
+    mainRemButton.config(command=lambda:gameDelete(event.widget))
 
 # !!!BUTTONS!!!
+
+steamList.bind("<FocusIn>", listSelect)
+noDrmList.bind("<FocusIn>", listSelect)
 runButton = Button(root, text="Run", command=runGame, height=2, width=15)
 runButton.grid(column=0, row=10, sticky=S+W)
 if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
 else: runButton.config(state=DISABLED)
-mainRemButton = Button(root, text="Remove From List", command=lambda:listEdit("remove", gameList))
+mainRemButton = Button(root, text="Remove From List")
 mainRemButton.grid(column=1, row=10, sticky=W)
 
 update()

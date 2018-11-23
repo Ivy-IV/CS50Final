@@ -2,6 +2,7 @@ from pathlib import Path
 from urllib.request import *
 import json
 from sqlite3 import *
+import keyring
 
 conn = connect('launcher.db')
 db = conn.cursor()
@@ -30,7 +31,7 @@ def steamSearch(dirPaths):
                 while "name" not in acfFile:
                     acfFile = k.readline()
                 sName = acfFile.replace('\"name\"', '').strip('\n\t\" ')
-            sL.append((sAppID, sName))
+            sL.append((sAppID, sName, 'steam',))
     return sL
 
 def steamGetList():
@@ -52,3 +53,13 @@ def steamGetList():
     conn.commit()
 
     return True
+
+def setLogin(prev, serv, unam, pword):
+    """Sets login info for a given games service"""
+    old = keyring.get_password(serv, unam)
+    if old == prev or not old:
+        keyring.set_password(serv, name, pword)
+        return True
+    else:
+        print("couldn't change password!")
+        return False
