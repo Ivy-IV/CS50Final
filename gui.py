@@ -31,7 +31,7 @@ ndScrolly = Scrollbar(root)
 ndScrolly.grid(column=1, row=0, sticky=NS + W)
 ndScrollx = Scrollbar(root, orient=HORIZONTAL)
 ndScrollx.grid(column=0, row=1, sticky=EW)
-noDrmList = Listbox(root, selectmode=SINGLE,
+noDrmList = Listbox(root, selectmode=MULTIPLE,
 yscrollcommand=ndScrolly.set, xscrollcommand=ndScrollx.set)
 noDrmList.grid(column=0, row=0, sticky=EW+NS,)
 ndScrolly.config(command=noDrmList.yview)
@@ -42,7 +42,7 @@ stScrolly = Scrollbar(root)
 stScrolly.grid(column=3, row=0, sticky=NS)
 stScrollx = Scrollbar(root, orient=HORIZONTAL)
 stScrollx.grid(column=2, row=1, sticky=EW)
-steamList = Listbox(root, selectmode=SINGLE,
+steamList = Listbox(root, selectmode=MULTIPLE,
 yscrollcommand=stScrolly.set, xscrollcommand=stScrollx.set)
 steamList.grid(column=2, row=0, sticky=EW+NS,)
 stScrolly.config(command=steamList.yview)
@@ -69,18 +69,18 @@ def listEdit(command, list):
             return True
         else: return False
     elif command == "remove":
-        select = list.curselection()
-        for i in select:
-            list.delete(i)
+        list.delete(list.curselection())
         return True
 
-def gameDelete(list):
-    select = list.curselection()
+def gameDelete(listb):
+    select = listb.curselection()
     for i in select:
-        j = list.get(i)
-        list.delete(i)
+        j = listb.get(i)
         rows = db.execute("DELETE FROM games WHERE pathid=?", (j[1],))
-        conn.commit()
+    listb.delete(select[0], select[-1])
+    conn.commit()
+
+
     return True
 
 def scanWindow():
@@ -148,8 +148,9 @@ def steamWindow():
 
     def userAdd():
         user = Toplevel(steam)
-        labelUser = Label(steam, text="Username:").grid(column=0, row=0)
-        enterUser = Entry(steam).grid(column=1, row=0, sticky=EW)
+        labelPrev = Label(user, text="Old Password:")
+        labelUser = Label(user, text="Username:").grid(column=0, row=1)
+        enterUser = Entry(user).grid(column=1, row=1, sticky=EW)
     userLabel = Label(steam, text="Username: " + steamUser)
 
     def steamAdd():
@@ -196,8 +197,7 @@ def steamWindow():
 
 
 def runGame(list):
-    index = list.curselection()
-    runName = list.get(index)[0]
+    runName = list.get(ACTIVE)[0]
     print(runName)
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
