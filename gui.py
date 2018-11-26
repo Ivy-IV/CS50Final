@@ -69,14 +69,15 @@ def listEdit(command, list):
             return True
         else: return False
     elif command == "remove":
-        list.delete(list.curselection())
+        select = list.curselection()
+        list.delete(select[0], select[-1])
         return True
 
 def gameDelete(listb):
     select = listb.curselection()
-    for i in select:
-        j = listb.get(i)
-        rows = db.execute("DELETE FROM games WHERE pathid=?", (j[1],))
+    selget = listb.get(select[0], select[-1])
+    for i in selget:
+        rows = db.execute("DELETE FROM games WHERE pathid=?", (i[1],))
     listb.delete(select[0], select[-1])
     conn.commit()
 
