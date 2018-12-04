@@ -11,9 +11,12 @@ from helper import *
 from pathlib import Path
 from subprocess import Popen, check_output, run
 import keyring
+import json
 
-steamLog = False;
-steamUser = ""
+with open("user.json", 'r') as userfile:
+    users = json.load(userfile)
+print(users)
+
 conn = connect('launcher.db')
 db = conn.cursor()
 
@@ -49,7 +52,7 @@ stScrolly.config(command=steamList.yview)
 stScrollx.config(command=steamList.xview)
 
 # !!!FUNCTIONS!!!
-def update():
+def gameUpdate():
     noDrmList.delete(0, END)
     rows = db.execute("SELECT * FROM games ORDER BY name")
     for i in rows:
@@ -60,6 +63,8 @@ def update():
             steamList.insert(END, i[0])
     if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
     else: runButton.config(state=DISABLED)
+    with open("user.json", 'w') as newUser:
+        json.dump(users, newUser)
 
 def listEdit(command, list):
     if command == "add":
@@ -80,9 +85,14 @@ def gameDelete(listb):
         rows = db.execute("DELETE FROM games WHERE pathid=?", (i[1],))
     listb.delete(select[0], select[-1])
     conn.commit()
-
-
     return True
+
+def errorMessage(parent, message):
+    error = Toplevel(parent)
+    error.grab_set()
+    error.title("Uh oh!")
+    labelError = Label(error, text=message).grid(sticky=NW+SE)
+    buttonError = Button(error, text="OK", command=error.destroy).grid(row=1, sticky=NW+SE)
 
 def scanWindow():
     scan = Toplevel(root)
@@ -117,7 +127,7 @@ def scanWindow():
                 rows = db.execute("INSERT OR REPLACE INTO games('name', 'pathid', drm) VALUES(?, ?, ?)",
                     noDInfo)
         conn.commit()
-        update()
+        gameUpdate()
         return True
 
     # !!!LIST!!!
@@ -148,11 +158,47 @@ def steamWindow():
     steam.grab_set()
 
     def userAdd():
-        user = Toplevel(steam)
+        user = Toplevel()
+        user.grab_set()
+
+        def userOK():
+            if enterPrev is not None:
+                prev = enterPrev.get()
+            else:
+                prev = ""
+            attempt = setLogin(enterUser.get(), enterPass.get(), prev, "steam", users)
+            if attempt is not True:
+                errorMessage(user, attempt)
+                return False
+            else:
+                users["steam"]["user"] = enterUser.get()
+                userLabel.config(text="Current: {}".format(users["steam"]["user"]))
+                print(users)
+                gameUpdate()
+                user.destroy()
+                return True
+
+        def userClear(service, unam):
+            clearLogin(server, unam)
+            users["steam"]["user"] = ""
+            users["steam"]["path"] = ""
+            userLabel.config(text="Current: {}".format(users["steam"]["user"]))
+            gameUpdate()
+            return True
+
         labelPrev = Label(user, text="Old Password:")
+        labelPrev.grid(row=0)
+        enterPrev = Entry(user, show='*')
+        enterPrev.grid(column=1, row=0, sticky=EW)
         labelUser = Label(user, text="Username:").grid(column=0, row=1)
-        enterUser = Entry(user).grid(column=1, row=1, sticky=EW)
-    userLabel = Label(steam, text="Username: " + steamUser)
+        enterUser = Entry(user)
+        enterUser.grid(column=1, row=1, sticky=EW)
+        passVar = StringVar()
+        labelPass = Label(user, text="Password:").grid(row=2)
+        enterPass = Entry(user, textvariable=passVar, show='*')
+        enterPass.grid(column=1, row=2, sticky=EW)
+        buttonOK = Button(user, text="OK", command=userOK).grid(columnspan=2, row=3)
+        buttonClear = Button(user, text="Clear Login", command=lambda:userClear(steam, users[steam]))
 
     def steamAdd():
         sList = steamSearch(steamDirList.get(0,END))
@@ -167,10 +213,15 @@ def steamWindow():
         if command == "ok":
             steamAdd()
             conn.commit()
-            update()
+
+            gameUpdate()
         elif command == "cancel":
             conn.rollback()
         steam.destroy()
+
+    def steamMain():
+        path = steamDirList.get(ACTIVE)
+        users["steam"]["path"] = path
 
     #!!!!!LIST!!!!!
     steamScry = Scrollbar(steam)
@@ -184,48 +235,32 @@ def steamWindow():
     steamScrx.config(command=steamDirList.xview)
 
 
-
+    userButton = Button(steam, text="Change User", command=userAdd)
+    userButton.grid(row=1)
+    userLabel = Label(steam, text="Current: {}".format(users["steam"]["user"]))
+    userLabel.grid(column=1, row=1, sticky=W)
     dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
     dirAddButton.grid(row=2, sticky=NE)
     dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
     dirRemButton.grid(row=2)
-    steamButton = Button(steam, text="Update Steam List", command=steamAdd)
-    steamButton.grid(column=1, row=4)
-    okButton = Button(steam, text="OK", width=10, command=lambda: steamQuit("ok"))
+    dirMainButton = Button(steam, text="Set Main Steam Directory", command=steamMain)
+    dirMainButton.grid(row=2, sticky=SE)
+    okButton = Button(steam, text="OK", width=10, command=lambda:steamQuit("ok"))
     okButton.grid(column=1, row=10, sticky=SE)
-    cancelButton = Button(steam, text="Cancel", width=10, command=lambda: steamQuit("cancel"))
+    cancelButton = Button(steam, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
     cancelButton.grid(column=0, row=10, sticky=SE)
 
 
 def runGame(list):
-    runName = list.get(ACTIVE)[0]
+    runName = list.get(ACTIVE)
     print(runName)
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
     if gameInfo[0] == "(steam,)":
-        # Check if Steam is running - found via:
-        # https://stackoverflow.com/questions/25545937/check-if-process-is-running-in-windows-using-only-python-built-in-modules
-        """ !!!!!!!Maybe to be abandoned!!!!!!!
-        if steamLog == False:
-            checkNo = 0
-            steamCheck = Popen('tasklist', shell=True).strip().split('\n')
-            for line in steamCheck:
-                if "steamwebhelper.exe" in line: checkNo += 1
-            print(steamCheck)
-            return False
-            if checkNo => 3:
-                steamCheck = True
-                steamLog = True
-            else: steamCheck = False
-            if steamCheck == False:
-                try: run(steamPath, "-login", steamUser, steamPass)
-                except:
-                    print("Login failed! oopsy")
-                    return False
-            steamLog = True
-            """
-
-        try: run(steamPath, "-applaunch", gameInfo[2])
+        try:
+            run(users["steam"]["path"], "-login", users["steam"]["user"],
+                keyring.get_password("steam", users["steam"]["user"]),
+                "-applaunch", gameInfo[2])
         except:
             print("Couldn't launch Steam game! oh no")
             return False
@@ -254,6 +289,6 @@ else: runButton.config(state=DISABLED)
 mainRemButton = Button(root, text="Remove From List")
 mainRemButton.grid(column=1, row=10, sticky=W)
 
-update()
+gameUpdate()
 root.mainloop()
 conn.close()

@@ -18,8 +18,8 @@ def search(path):
 
 def steamSearch(dirPaths):
     """Search Steam folders for list of installed apps, return their names and IDs"""
+    sL = []
     for i in dirPaths:
-        sL = []
         iPath = Path(i)
         appsPath = iPath.glob('steamapps/*.acf')
         for j in appsPath:
@@ -54,12 +54,16 @@ def steamGetList():
 
     return True
 
-def setLogin(prev, serv, unam, pword):
+def setLogin(unam, pword, prev, serv, json):
     """Sets login info for a given games service"""
     old = keyring.get_password(serv, unam)
-    if old == prev or not old:
-        keyring.set_password(serv, name, pword)
+    print("old={} prev={}".format(old, prev))
+    if old == prev or old == None:
+        keyring.set_password(serv, unam, pword)
         return True
     else:
-        print("couldn't change password!")
-        return False
+        return "Old password given didn't match saved password!"
+
+def clearLogin(serv, unam):
+    keyring.delete_password(serv, unam)
+    return True
