@@ -9,7 +9,7 @@ from tkinter import filedialog
 from sqlite3 import *
 from helper import *
 from pathlib import Path
-from subprocess import Popen, check_output, run
+from subprocess import run, Popen
 import keyring
 import json
 
@@ -34,7 +34,7 @@ ndScrolly = Scrollbar(root)
 ndScrolly.grid(column=1, row=0, sticky=NS + W)
 ndScrollx = Scrollbar(root, orient=HORIZONTAL)
 ndScrollx.grid(column=0, row=1, sticky=EW)
-noDrmList = Listbox(root, selectmode=MULTIPLE,
+noDrmList = Listbox(root, selectmode=EXTENDED,
 yscrollcommand=ndScrolly.set, xscrollcommand=ndScrollx.set)
 noDrmList.grid(column=0, row=0, sticky=EW+NS,)
 ndScrolly.config(command=noDrmList.yview)
@@ -45,7 +45,7 @@ stScrolly = Scrollbar(root)
 stScrolly.grid(column=3, row=0, sticky=NS)
 stScrollx = Scrollbar(root, orient=HORIZONTAL)
 stScrollx.grid(column=2, row=1, sticky=EW)
-steamList = Listbox(root, selectmode=MULTIPLE,
+steamList = Listbox(root, selectmode=EXTENDED,
 yscrollcommand=stScrolly.set, xscrollcommand=stScrollx.set)
 steamList.grid(column=2, row=0, sticky=EW+NS,)
 stScrolly.config(command=steamList.yview)
@@ -57,7 +57,7 @@ def gameUpdate():
     rows = db.execute("SELECT * FROM games ORDER BY name")
     for i in rows:
         if i[1] == 'none':
-            game = i[0], i[2]
+            game = i[0]
             noDrmList.insert(END, game)
         elif i[1] == 'steam':
             steamList.insert(END, i[0])
@@ -80,9 +80,10 @@ def listEdit(command, list):
 
 def gameDelete(listb):
     select = listb.curselection()
-    selget = listb.get(select[0], select[-1])
+    selget = []
+    selget.append(listb.get(select[0], select[-1]))
     for i in selget:
-        rows = db.execute("DELETE FROM games WHERE pathid=?", (i[1],))
+        rows = db.execute("DELETE FROM games WHERE name=?", i)
     listb.delete(select[0], select[-1])
     conn.commit()
     return True
@@ -159,6 +160,7 @@ def steamWindow():
 
     def userAdd():
         user = Toplevel()
+        user.title("Set Steam User")
         user.grab_set()
 
         def userOK():
@@ -220,7 +222,7 @@ def steamWindow():
         steam.destroy()
 
     def steamMain():
-        path = steamDirList.get(ACTIVE)
+        path = steamDirList.get(ACTIVE) + "/Steam.exe"
         users["steam"]["path"] = path
 
     #!!!!!LIST!!!!!
@@ -234,11 +236,12 @@ def steamWindow():
     steamScry.config(command=steamDirList.yview)
     steamScrx.config(command=steamDirList.xview)
 
-
     userButton = Button(steam, text="Change User", command=userAdd)
-    userButton.grid(row=1)
+    userButton.grid(row=0)
     userLabel = Label(steam, text="Current: {}".format(users["steam"]["user"]))
-    userLabel.grid(column=1, row=1, sticky=W)
+    userLabel.grid(column=1, row=0, sticky=W)
+    dirLabel = Label(steam, text="Main Steam Path: {}".format(users["steam"]["path"]))
+    dirLabel.grid(row=1, columnspan=2, sticky=W)
     dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
     dirAddButton.grid(row=2, sticky=NE)
     dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
@@ -250,22 +253,20 @@ def steamWindow():
     cancelButton = Button(steam, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
     cancelButton.grid(column=0, row=10, sticky=SE)
 
-
 def runGame(list):
     runName = list.get(ACTIVE)
-    print(runName)
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
-    if gameInfo[0] == "(steam,)":
-        try:
-            run(users["steam"]["path"], "-login", users["steam"]["user"],
-                keyring.get_password("steam", users["steam"]["user"]),
-                "-applaunch", gameInfo[2])
-        except:
-            print("Couldn't launch Steam game! oh no")
-            return False
+    if gameInfo[0] == "steam":
 
-    elif gameInfo[0] == "(none,)": Popen(gameInfo[1])
+            run([users["steam"]["path"], "-login", users["steam"]["user"],
+                keyring.get_password("steam", users["steam"]["user"]),
+                "-applaunch", gameInfo[1]])
+
+
+    elif gameInfo[0] == "none":
+        run(gameInfo[1])
+
 
 # !!!MENUS!!!
 menuBar = Menu(root)
@@ -274,15 +275,23 @@ menuBar.add_command(label="Steam", command=steamWindow)
 # Add menu to root window
 root.config(menu=menuBar)
 
+# !!!EVENT HANDLERS!!!
 def listSelect(event):
     runButton.config(command=lambda:runGame(event.widget))
     mainRemButton.config(command=lambda:gameDelete(event.widget))
-
+def doubleClick(event):
+    runGame(event.widget)
+def deleteGame(event):
+    gameDelete(event.widget)
 # !!!BUTTONS!!!
 
 steamList.bind("<FocusIn>", listSelect)
+steamList.bind("<Double-Button-1>", doubleClick)
 noDrmList.bind("<FocusIn>", listSelect)
-runButton = Button(root, text="Run", command=runGame, height=2, width=15)
+noDrmList.bind("<Double-Button-1>", doubleClick)
+steamList.bind("<Delete>", deleteGame)
+noDrmList.bind("<Delete>", deleteGame)
+runButton = Button(root, text="Run", height=2, width=15)
 runButton.grid(column=0, row=10, sticky=S+W)
 if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
 else: runButton.config(state=DISABLED)
