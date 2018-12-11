@@ -25,29 +25,29 @@ root.title("IVyVI Game Launcher")
 root.geometry("800x600")
 root.grid_columnconfigure(index=0, weight=1)
 root.grid_columnconfigure(index=2, weight=1)
-root.grid_rowconfigure(index=0, weight=1)
+root.grid_rowconfigure(index=1, weight=1)
 
 
 # !!!GAME LISTS!!!
-ndLabel = Label(root, text="No DRM")
+ndLabel = Label(root, text="No DRM").grid()
 ndScrolly = Scrollbar(root)
-ndScrolly.grid(column=1, row=0, sticky=NS + W)
+ndScrolly.grid(column=1, row=1, sticky=NS + W)
 ndScrollx = Scrollbar(root, orient=HORIZONTAL)
-ndScrollx.grid(column=0, row=1, sticky=EW)
+ndScrollx.grid(column=0, row=2, sticky=EW)
 noDrmList = Listbox(root, selectmode=EXTENDED,
 yscrollcommand=ndScrolly.set, xscrollcommand=ndScrollx.set)
-noDrmList.grid(column=0, row=0, sticky=EW+NS,)
+noDrmList.grid(column=0, row=1, sticky=EW+NS,)
 ndScrolly.config(command=noDrmList.yview)
 ndScrollx.config(command=noDrmList.xview)
 
-stLabel = Label (root, text="Steam")
+stLabel = Label (root, text="Steam").grid(column=2, row=0)
 stScrolly = Scrollbar(root)
-stScrolly.grid(column=3, row=0, sticky=NS)
+stScrolly.grid(column=3, row=1, sticky=NS)
 stScrollx = Scrollbar(root, orient=HORIZONTAL)
-stScrollx.grid(column=2, row=1, sticky=EW)
+stScrollx.grid(column=2, row=2, sticky=EW)
 steamList = Listbox(root, selectmode=EXTENDED,
 yscrollcommand=stScrolly.set, xscrollcommand=stScrollx.set)
-steamList.grid(column=2, row=0, sticky=EW+NS,)
+steamList.grid(column=2, row=1, sticky=EW+NS,)
 stScrolly.config(command=steamList.yview)
 stScrollx.config(command=steamList.xview)
 
@@ -215,7 +215,6 @@ def steamWindow():
         if command == "ok":
             steamAdd()
             conn.commit()
-
             gameUpdate()
         elif command == "cancel":
             conn.rollback()
@@ -246,7 +245,7 @@ def steamWindow():
     dirAddButton.grid(row=2, sticky=NE)
     dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
     dirRemButton.grid(row=2)
-    dirMainButton = Button(steam, text="Set Main Steam Directory", command=steamMain)
+    dirMainButton = Button(steam, text="Set as Main Steam Directory", command=steamMain)
     dirMainButton.grid(row=2, sticky=SE)
     okButton = Button(steam, text="OK", width=10, command=lambda:steamQuit("ok"))
     okButton.grid(column=1, row=10, sticky=SE)
@@ -281,22 +280,25 @@ def listSelect(event):
     mainRemButton.config(command=lambda:gameDelete(event.widget))
 def doubleClick(event):
     runGame(event.widget)
+def deleteList(event):
+    selection = event.widget.curselection()
+    event.widget.delete(selection[0], selection[-1])
 def deleteGame(event):
     gameDelete(event.widget)
 # !!!BUTTONS!!!
-
 steamList.bind("<FocusIn>", listSelect)
-steamList.bind("<Double-Button-1>", doubleClick)
 noDrmList.bind("<FocusIn>", listSelect)
+steamList.bind("<Double-Button-1>", doubleClick)
 noDrmList.bind("<Double-Button-1>", doubleClick)
 steamList.bind("<Delete>", deleteGame)
 noDrmList.bind("<Delete>", deleteGame)
+root.bind_class("Listbox", "<Delete>", deleteList)
 runButton = Button(root, text="Run", height=2, width=15)
 runButton.grid(column=0, row=10, sticky=S+W)
 if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
 else: runButton.config(state=DISABLED)
 mainRemButton = Button(root, text="Remove From List")
-mainRemButton.grid(column=1, row=10, sticky=W)
+mainRemButton.grid(column=2, row=10, sticky=E)
 
 gameUpdate()
 root.mainloop()
