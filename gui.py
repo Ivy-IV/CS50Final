@@ -54,7 +54,8 @@ stScrollx.config(command=steamList.xview)
 # !!!FUNCTIONS!!!
 def gameUpdate():
     noDrmList.delete(0, END)
-    rows = db.execute("SELECT * FROM games ORDER BY name")
+    steamList.delete(0, END)
+    rows = db.execute("SELECT * FROM games ORDER BY LOWER(name)")
     for i in rows:
         if i[1] == 'none':
             game = i[0]
@@ -92,16 +93,22 @@ def errorMessage(parent, message):
     error = Toplevel(parent)
     error.grab_set()
     error.title("Uh oh!")
-    labelError = Label(error, text=message).grid(sticky=NW+SE)
+    labelError = Label(error, text=message, pady=5, padx=5, relief=RAISED).grid(sticky=NW+SE)
     buttonError = Button(error, text="OK", command=error.destroy).grid(row=1, sticky=NW+SE)
 
+"""!!!!!!Search for games!!!!!!"""
 def scanWindow():
     scan = Toplevel(root)
     scan.title("Scan Folder")
     scan.geometry("400x600")
-    scan.grid_columnconfigure(index=1, weight=1)
+    scan.grid_columnconfigure(index=0, weight=1)
     scan.grab_set()
 
+    """!!!!!!Games with no digital management!!!!!!"""
+    noDrmLabel = Label(scan, text="No DRM/Digital Service", height=2).grid(columnspan=2)
+    noDrmFrame = Frame(scan)
+    noDrmFrame.grid(row=1, sticky=NW+SE)
+    noDrmFrame.grid_columnconfigure(index=1, weight=1)
     def getList(type):
         # Add single file to list
         if type == 0:
@@ -113,17 +120,15 @@ def scanWindow():
             games = search(path)
             for item in games:
                 if Path(item) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, item)
-        addButton.grid(column=5, row=5, sticky=SE)
+
         return True
 
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TODO!!!!!!!!!!!!!
     def addNoDRM():
         select = addList.curselection()
         for i in select:
             path = addList.get(i)
             noDInfo = [Path(path).stem, path, 'none',]
             rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (path,))
-            # Returns generator object --- need to use result in condition
             if path not in rows.fetchall():
                 rows = db.execute("INSERT OR REPLACE INTO games('name', 'pathid', drm) VALUES(?, ?, ?)",
                     noDInfo)
@@ -132,31 +137,30 @@ def scanWindow():
         return True
 
     # !!!LIST!!!
-    scrolly = Scrollbar(scan)
+    scrolly = Scrollbar(noDrmFrame)
     scrolly.grid(column=3, rowspan=2, sticky=NS)
-    scrollx = Scrollbar(scan, orient=HORIZONTAL)
+    scrollx = Scrollbar(noDrmFrame, orient=HORIZONTAL)
     scrollx.grid(column=1, columnspan=2, row=2, sticky=EW)
-    addList = Listbox(scan, selectmode=MULTIPLE,
+    addList = Listbox(noDrmFrame, selectmode=MULTIPLE,
     yscrollcommand=scrolly.set, xscrollcommand=scrollx.set)
-    addList.grid(column=1, columnspan=2, row=0, rowspan = 2, sticky=EW+NS,)
+    addList.grid(column=1, columnspan=2, row=0, rowspan=2, sticky=EW+NS,)
     scrolly.config(command=addList.yview)
     scrollx.config(command=addList.xview)
     # !!!BUTTONS!!!
-    fileButton = Button(scan, text="Select File", command=lambda: getList(0))
+    fileButton = Button(noDrmFrame, text="Select File", command=lambda: getList(0))
     fileButton.grid(column=0, row=0, sticky=N+EW)
 
-    folderButton = Button(scan, text="Scan Folder", command=lambda: getList(1))
+    folderButton = Button(noDrmFrame, text="Scan Folder", command=lambda: getList(1))
     folderButton.grid(column=0, row=1, sticky=N+EW)
 
-    addButton = Button(scan, text="Add to Games", command=addNoDRM)
+    addButton = Button(noDrmFrame, text="Add to Games", command=addNoDRM)
+    addButton.grid(column=1, row=3, sticky=SE)
 
-def steamWindow():
-    steam = Toplevel(root)
-    steam.title("Add Steam Games")
-    steam.geometry("300x300")
-    steam.grid_columnconfigure(index=1, weight=1)
-    steam.grid_rowconfigure(index=9, weight=1)
-    steam.grab_set()
+    """!!!!!!Steam Games!!!!!!"""
+    steamLabel = Label(scan, text="Steam Games").grid(row=2,columnspan=2)
+    steamFrame = Frame(scan)
+    steamFrame.grid(row=3, sticky=NW+SE)
+    steamFrame.grid_columnconfigure(index=1, weight=1)
 
     def userAdd():
         user = Toplevel()
@@ -177,7 +181,7 @@ def steamWindow():
                 userLabel.config(text="Current: {}".format(users["steam"]["user"]))
                 print(users)
                 gameUpdate()
-                user.destroy()
+                scan.destroy()
                 return True
 
         def userClear(service, unam):
@@ -203,13 +207,15 @@ def steamWindow():
         buttonClear = Button(user, text="Clear Login", command=lambda:userClear(steam, users[steam]))
 
     def steamAdd():
-        sList = steamSearch(steamDirList.get(0,END))
-        for i in sList:
+        sList = steamDirList.get(0,END)
+        for i in steamSearch(sList):
             rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (i[0],))
             if i[0] not in rows.fetchall():
                 ins = db.execute("INSERT OR REPLACE INTO games(pathid, name, drm) VALUES(?, ?, ?)", i)
+            for i in sList:
+                if Path(i, 'Steam.exe').exists():
+                    users["steam"]["path"] = i + '/Steam.exe'
         return True
-
 
     def steamQuit(command):
         if command == "ok":
@@ -218,38 +224,32 @@ def steamWindow():
             gameUpdate()
         elif command == "cancel":
             conn.rollback()
-        steam.destroy()
-
-    def steamMain():
-        path = steamDirList.get(ACTIVE) + "/Steam.exe"
-        users["steam"]["path"] = path
+        scan.destroy()
 
     #!!!!!LIST!!!!!
-    steamScry = Scrollbar(steam)
+    steamScry = Scrollbar(steamFrame)
     steamScry.grid(column=3, row=2, sticky=NS)
-    steamScrx = Scrollbar(steam, orient=HORIZONTAL)
+    steamScrx = Scrollbar(steamFrame, orient=HORIZONTAL)
     steamScrx.grid(column=1, columnspan=2, row=3, sticky=EW)
-    steamDirList = Listbox(steam, selectmode=MULTIPLE, height=5,
+    steamDirList = Listbox(steamFrame, selectmode=MULTIPLE, height=5,
     yscrollcommand=steamScry.set, xscrollcommand=steamScrx.set)
     steamDirList.grid(column=1, columnspan=2, row=2, sticky=EW+NS,)
     steamScry.config(command=steamDirList.yview)
     steamScrx.config(command=steamDirList.xview)
 
-    userButton = Button(steam, text="Change User", command=userAdd)
+    userButton = Button(steamFrame, text="Change User", command=userAdd)
     userButton.grid(row=0)
-    userLabel = Label(steam, text="Current: {}".format(users["steam"]["user"]))
+    userLabel = Label(steamFrame, text="Current: {}".format(users["steam"]["user"]))
     userLabel.grid(column=1, row=0, sticky=W)
-    dirLabel = Label(steam, text="Main Steam Path: {}".format(users["steam"]["path"]))
+    dirLabel = Label(steamFrame, text="Steam Launcher Location: {}".format(users["steam"]["path"]))
     dirLabel.grid(row=1, columnspan=2, sticky=W)
-    dirAddButton = Button(steam, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
+    dirAddButton = Button(steamFrame, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
     dirAddButton.grid(row=2, sticky=NE)
-    dirRemButton = Button(steam, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
+    dirRemButton = Button(steamFrame, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
     dirRemButton.grid(row=2)
-    dirMainButton = Button(steam, text="Set as Main Steam Directory", command=steamMain)
-    dirMainButton.grid(row=2, sticky=SE)
-    okButton = Button(steam, text="OK", width=10, command=lambda:steamQuit("ok"))
+    okButton = Button(steamFrame, text="OK", width=10, command=lambda:steamQuit("ok"))
     okButton.grid(column=1, row=10, sticky=SE)
-    cancelButton = Button(steam, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
+    cancelButton = Button(steamFrame, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
     cancelButton.grid(column=0, row=10, sticky=SE)
 
 def runGame(list):
@@ -257,20 +257,28 @@ def runGame(list):
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
     if gameInfo[0] == "steam":
-
+        try:
+            # If this results in an attept to install which is cancelled the root window freezes
             run([users["steam"]["path"], "-login", users["steam"]["user"],
                 keyring.get_password("steam", users["steam"]["user"]),
                 "-applaunch", gameInfo[1]])
-
+            return True
+        except FileNotFoundError:
+            errorMessage(root, "Steam.exe not found at\n{}".format(users["steam"]["path"]))
+            return False
 
     elif gameInfo[0] == "none":
-        run(gameInfo[1])
-
+        try:
+            run(gameInfo[1])
+            return True
+        except FileNotFoundError:
+            errorMessage(root, "File at \n{}\n not found!".format(gameInfo[1]))
+            gameDelete(list)
+            return False
 
 # !!!MENUS!!!
 menuBar = Menu(root)
-menuBar.add_command(label="Scan Folder", command=scanWindow)
-menuBar.add_command(label="Steam", command=steamWindow)
+menuBar.add_command(label="Search for Games", command=scanWindow)
 # Add menu to root window
 root.config(menu=menuBar)
 
