@@ -10,6 +10,7 @@ from sqlite3 import *
 from helper import *
 from pathlib import Path
 from subprocess import run, Popen
+from multiprocessing import Process
 import keyring
 import json
 
@@ -220,6 +221,7 @@ def scanWindow():
     def steamQuit(command):
         if command == "ok":
             steamAdd()
+            addNoDRM()
             conn.commit()
             gameUpdate()
         elif command == "cancel":
@@ -247,9 +249,9 @@ def scanWindow():
     dirAddButton.grid(row=2, sticky=NE)
     dirRemButton = Button(steamFrame, text="Remove Steam Directory", command=lambda:listEdit("remove", steamDirList))
     dirRemButton.grid(row=2)
-    okButton = Button(steamFrame, text="OK", width=10, command=lambda:steamQuit("ok"))
+    okButton = Button(scan, text="OK", width=10, command=lambda:steamQuit("ok"))
     okButton.grid(column=1, row=10, sticky=SE)
-    cancelButton = Button(steamFrame, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
+    cancelButton = Button(scan, text="Cancel", width=10, command=lambda:steamQuit("cancel"))
     cancelButton.grid(column=0, row=10, sticky=SE)
 
 def runGame(list):
@@ -257,24 +259,22 @@ def runGame(list):
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
     if gameInfo[0] == "steam":
-        try:
-            # If this results in an attept to install which is cancelled the root window freezes
-            run([users["steam"]["path"], "-login", users["steam"]["user"],
-                keyring.get_password("steam", users["steam"]["user"]),
-                "-applaunch", gameInfo[1]])
-            return True
-        except FileNotFoundError:
-            errorMessage(root, "Steam.exe not found at\n{}".format(users["steam"]["path"]))
-            return False
+            try:
+                Popen([users["steam"]["path"], "-login", users["steam"]["user"],
+                    keyring.get_password("steam", users["steam"]["user"]),
+                    "-applaunch", gameInfo[1]], shell=True)
+                return True
+            except FileNotFoundError:
+                errorMessage(root, "Steam.exe not found at\n{}".format(users["steam"]["path"]))
+                return False
 
     elif gameInfo[0] == "none":
         try:
-            run(gameInfo[1])
+            Popen(gameInfo[1], shell=True)
             return True
         except FileNotFoundError:
             errorMessage(root, "File at \n{}\n not found!".format(gameInfo[1]))
             gameDelete(list)
-            return False
 
 # !!!MENUS!!!
 menuBar = Menu(root)
