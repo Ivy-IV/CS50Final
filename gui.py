@@ -101,15 +101,16 @@ def errorMessage(parent, message):
 def scanWindow():
     scan = Toplevel(root)
     scan.title("Scan Folder")
-    scan.geometry("400x600")
+    scan.geometry("800x430")
     scan.grid_columnconfigure(index=0, weight=1)
     scan.grab_set()
 
     """!!!!!!Games with no digital management!!!!!!"""
     noDrmLabel = Label(scan, text="No DRM/Digital Service", height=2).grid(columnspan=2)
     noDrmFrame = Frame(scan)
-    noDrmFrame.grid(row=1, sticky=NW+SE)
+    noDrmFrame.grid(columnspan=2, row=1, sticky=NW+SE)
     noDrmFrame.grid_columnconfigure(index=1, weight=1)
+    noDrmFrame.grid_columnconfigure(index=5, weight=1)
     def getList(type):
         # Add single file to list
         if type == 0:
@@ -120,9 +121,15 @@ def scanWindow():
             path = filedialog.askdirectory()
             games = search(path)
             for item in games:
-                if Path(item) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, item)
+                if Path(item) not in [Path(i) for i in leaveList.get(0, END)]: leaveList.insert(END, item)
 
         return True
+    def listSwap(command):
+        lists = (addList, leaveList) if command == "add" else (leaveList, addList)
+        select = lists[1].curselection()
+        for j in reversed(select):
+            lists[0].insert(0, lists[1].get(j))
+            lists[1].delete(j)
 
     def addNoDRM():
         select = addList.curselection()
@@ -138,29 +145,39 @@ def scanWindow():
         return True
 
     # !!!LIST!!!
+    leaveScrolly = Scrollbar(noDrmFrame)
+    leaveScrolly.grid(column=3, rowspan=2, sticky=NS)
+    leaveScrollx = Scrollbar(noDrmFrame, orient=HORIZONTAL)
+    leaveScrollx.grid(column=1, columnspan=2, row=2, sticky=EW)
+    leaveList = Listbox(noDrmFrame, selectmode=MULTIPLE,
+    yscrollcommand=leaveScrolly.set, xscrollcommand=leaveScrollx.set)
+    leaveList.grid(column=1, columnspan=2, row=0, rowspan=2, sticky=EW+NS,)
+    leaveScrolly.config(command=leaveList.yview)
+    leaveScrollx.config(command=leaveList.xview)
+
     scrolly = Scrollbar(noDrmFrame)
-    scrolly.grid(column=3, rowspan=2, sticky=NS)
+    scrolly.grid(column=7, row=0, rowspan=2, sticky=NS)
     scrollx = Scrollbar(noDrmFrame, orient=HORIZONTAL)
-    scrollx.grid(column=1, columnspan=2, row=2, sticky=EW)
+    scrollx.grid(column=5, columnspan=2, row=2, sticky=EW)
     addList = Listbox(noDrmFrame, selectmode=MULTIPLE,
     yscrollcommand=scrolly.set, xscrollcommand=scrollx.set)
-    addList.grid(column=1, columnspan=2, row=0, rowspan=2, sticky=EW+NS,)
+    addList.grid(column=5, columnspan=2, row=0, rowspan=2, sticky=EW+NS,)
     scrolly.config(command=addList.yview)
     scrollx.config(command=addList.xview)
     # !!!BUTTONS!!!
     fileButton = Button(noDrmFrame, text="Select File", command=lambda: getList(0))
     fileButton.grid(column=0, row=0, sticky=N+EW)
-
     folderButton = Button(noDrmFrame, text="Scan Folder", command=lambda: getList(1))
     folderButton.grid(column=0, row=1, sticky=N+EW)
-
-    addButton = Button(noDrmFrame, text="Add to Games", command=addNoDRM)
-    addButton.grid(column=1, row=3, sticky=SE)
+    addButton = Button(noDrmFrame, width=6, text="Add\n-->", command=lambda:listSwap("add"))
+    addButton.grid(column=4, row=0)
+    remButton = Button(noDrmFrame, text="Remove\n<--", command=lambda:listSwap("remove"))
+    remButton.grid(column=4, row=1)
 
     """!!!!!!Steam Games!!!!!!"""
     steamLabel = Label(scan, text="Steam Games").grid(row=2,columnspan=2)
     steamFrame = Frame(scan)
-    steamFrame.grid(row=3, sticky=NW+SE)
+    steamFrame.grid(columnspan=2, row=3, sticky=NW+SE)
     steamFrame.grid_columnconfigure(index=1, weight=1)
 
     def userAdd():
