@@ -16,7 +16,6 @@ import json
 
 with open("user.json", 'r') as userfile:
     users = json.load(userfile)
-print(users)
 
 conn = connect('launcher.db')
 db = conn.cursor()
@@ -82,10 +81,9 @@ def listEdit(command, list):
 
 def gameDelete(listb):
     select = listb.curselection()
-    selget = []
-    selget.append(listb.get(select[0], select[-1]))
+    selget = listb.get(select[0], select[-1])
     for i in selget:
-        rows = db.execute("DELETE FROM games WHERE name=?", i)
+        rows = db.execute("DELETE FROM games WHERE name=?", (i,))
     listb.delete(select[0], select[-1])
     conn.commit()
     return True
@@ -107,10 +105,11 @@ def scanWindow():
 
     """!!!!!!Games with no digital management!!!!!!"""
     noDrmLabel = Label(scan, text="No DRM/Digital Service", height=2).grid(columnspan=2)
-    noDrmFrame = Frame(scan)
-    noDrmFrame.grid(columnspan=2, row=1, sticky=NW+SE)
+    noDrmFrame = Frame(scan, borderwidth=1, relief=SUNKEN)
+    noDrmFrame.grid(columnspan=2, row=2, sticky=NW+SE)
     noDrmFrame.grid_columnconfigure(index=1, weight=1)
     noDrmFrame.grid_columnconfigure(index=5, weight=1)
+
     def getList(type):
         # Add single file to list
         if type == 0:
@@ -175,9 +174,9 @@ def scanWindow():
     remButton.grid(column=4, row=1)
 
     """!!!!!!Steam Games!!!!!!"""
-    steamLabel = Label(scan, text="Steam Games").grid(row=2,columnspan=2)
-    steamFrame = Frame(scan)
-    steamFrame.grid(columnspan=2, row=3, sticky=NW+SE)
+    steamLabel = Label(scan, text="Steam Games").grid(row=3,columnspan=2)
+    steamFrame = Frame(scan, borderwidth=1, relief=SUNKEN)
+    steamFrame.grid(columnspan=2, row=5, sticky=NW+SE)
     steamFrame.grid_columnconfigure(index=1, weight=1)
 
     def userAdd():
@@ -197,18 +196,9 @@ def scanWindow():
             else:
                 users["steam"]["user"] = enterUser.get()
                 userLabel.config(text="Current: {}".format(users["steam"]["user"]))
-                print(users)
                 gameUpdate()
-                scan.destroy()
+                user.destroy()
                 return True
-
-        def userClear(service, unam):
-            clearLogin(server, unam)
-            users["steam"]["user"] = ""
-            users["steam"]["path"] = ""
-            userLabel.config(text="Current: {}".format(users["steam"]["user"]))
-            gameUpdate()
-            return True
 
         labelPrev = Label(user, text="Old Password:")
         labelPrev.grid(row=0)
@@ -223,6 +213,28 @@ def scanWindow():
         enterPass.grid(column=1, row=2, sticky=EW)
         buttonOK = Button(user, text="OK", command=userOK).grid(columnspan=2, row=3)
         buttonClear = Button(user, text="Clear Login", command=lambda:userClear(steam, users[steam]))
+
+    def clear():
+        clear = Toplevel()
+        clear.title("Remove Steam User Data")
+        clear.grab_set()
+
+
+        def userClear(service, unam):
+            clearLogin(service, unam)
+            users["steam"]["user"] = ""
+            users["steam"]["path"] = ""
+            userLabel.config(text="Current: {}".format(users["steam"]["user"]))
+            gameUpdate()
+            clear.destroy()
+            return True
+
+        clearLabel = Label(clear, text="This will reset the user information for logging into Steam.", wraplength=200, pady=10)
+        clearLabel.grid(columnspan=2, sticky=W+E)
+        yesButton = Button(clear, text="Yes", command=lambda:userClear("steam", users["steam"]["user"]), padx=20)
+        yesButton.grid(row=1)
+        noButton = Button(clear, text="No", command=clear.destroy, padx=20)
+        noButton.grid(row=1, column=1)
 
     def steamAdd():
         sList = steamDirList.get(0,END)
@@ -258,8 +270,10 @@ def scanWindow():
 
     userButton = Button(steamFrame, text="Change User", command=userAdd)
     userButton.grid(row=0)
+    clearButton = Button(steamFrame, text="Clear User Data", command=clear)
+    clearButton.grid(column=1, row=0, sticky=W)
     userLabel = Label(steamFrame, text="Current: {}".format(users["steam"]["user"]))
-    userLabel.grid(column=1, row=0, sticky=W)
+    userLabel.grid(column=1, row=0)
     dirLabel = Label(steamFrame, text="Steam Launcher Location: {}".format(users["steam"]["path"]))
     dirLabel.grid(row=1, columnspan=2, sticky=W)
     dirAddButton = Button(steamFrame, text="Add Steam Directory", command=lambda:listEdit("add", steamDirList))
@@ -305,9 +319,7 @@ def listSelect(event):
     mainRemButton.config(command=lambda:gameDelete(event.widget))
 def doubleClick(event):
     runGame(event.widget)
-def deleteList(event):
-    selection = event.widget.curselection()
-    event.widget.delete(selection[0], selection[-1])
+
 def deleteGame(event):
     gameDelete(event.widget)
 # !!!BUTTONS!!!
@@ -317,7 +329,7 @@ steamList.bind("<Double-Button-1>", doubleClick)
 noDrmList.bind("<Double-Button-1>", doubleClick)
 steamList.bind("<Delete>", deleteGame)
 noDrmList.bind("<Delete>", deleteGame)
-root.bind_class("Listbox", "<Delete>", deleteList)
+
 runButton = Button(root, text="Run", height=2, width=15)
 runButton.grid(column=0, row=10, sticky=S+W)
 if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
