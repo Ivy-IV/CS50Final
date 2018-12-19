@@ -10,7 +10,6 @@ from sqlite3 import *
 from helper import *
 from pathlib import Path
 from subprocess import run, Popen
-from multiprocessing import Process
 import keyring
 import json
 
@@ -291,13 +290,20 @@ def runGame(list):
     gameInfo = rows.fetchone()
     if gameInfo[0] == "steam":
             try:
-                Popen([users["steam"]["path"], "-login", users["steam"]["user"],
-                    keyring.get_password("steam", users["steam"]["user"]),
-                    "-applaunch", gameInfo[1]], shell=True)
-                return True
+                if not users["steam"]["path"]:
+                    raise RuntimeError
+                elif not users["steam"]["user"]:
+                    Popen([users["steam"]["path"], "-applaunch", gameInfo[1]], shell=True)
+                else:
+                    Popen([users["steam"]["path"], "-login", users["steam"]["user"],
+                        keyring.get_password("steam", users["steam"]["user"]),
+                        "-applaunch", gameInfo[1]], shell=True)
+                    return True
             except FileNotFoundError:
                 errorMessage(root, "Steam.exe not found at\n{}".format(users["steam"]["path"]))
                 return False
+            except RuntimeError:
+                errorMessage(root, "Path containing Steam.exe not found!")
 
     elif gameInfo[0] == "none":
         try:
@@ -319,7 +325,6 @@ def listSelect(event):
     mainRemButton.config(command=lambda:gameDelete(event.widget))
 def doubleClick(event):
     runGame(event.widget)
-
 def deleteGame(event):
     gameDelete(event.widget)
 # !!!BUTTONS!!!

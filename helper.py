@@ -10,11 +10,11 @@ db = conn.cursor()
 def search(path):
     """ Search folder and subfolders for .exe files and return them in a list """
     # Convert string to path object
-    jeff = Path(path)
+    folder = Path(path)
     # Get list of every exe in the path folder + its subfolders
-    joff = jeff.glob('**/*.exe')
+    exeList = jeff.glob('**/*.exe')
 
-    return joff
+    return exeList
 
 def steamSearch(dirPaths):
     """Search Steam folders for list of installed apps, return their names and IDs"""
@@ -31,33 +31,14 @@ def steamSearch(dirPaths):
                 while "name" not in acfFile:
                     acfFile = k.readline()
                 sName = acfFile.replace('\"name\"', '').strip('\n\t\" ')
+            if sAppID == "228980":
+                break
             sL.append((sAppID, sName, 'steam',))
     return sL
-
-def steamGetList():
-    """ Get list of all Steam games and add them to a table in launcher.db """
-    try:
-        steamGet = urlopen("http://api.steampowered.com/ISteamApps/GetAppList/v0002/?key=STEAMKEY&format=json").read()
-    except:
-        print("couldn't connect to steam api!")
-        return False
-    try:
-        steamJSON = json.loads(steamGet, encoding="UTF-8")["applist"]["apps"]
-    except:
-        print("hey the json didn't encode")
-        return False
-
-    for i in steamJSON:
-        rows = db.execute("INSERT or IGNORE INTO steamlist(appid, name) VALUES (?, ?)", (i["appid"], i["name"]))
-
-    conn.commit()
-
-    return True
 
 def setLogin(unam, pword, prev, serv, json):
     """Sets login info for a given games service"""
     old = keyring.get_password(serv, unam)
-    print("old={} prev={}".format(old, prev))
     if old == prev or old == None:
         keyring.set_password(serv, unam, pword)
         return True
