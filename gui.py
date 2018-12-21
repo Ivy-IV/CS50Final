@@ -13,6 +13,7 @@ from subprocess import run, Popen
 import keyring
 import json
 
+# Open the JSON object containing login and directory information
 with open("user.json", 'r') as userfile:
     users = json.load(userfile)
 
@@ -20,14 +21,13 @@ conn = connect('launcher.db')
 db = conn.cursor()
 
 root = Tk()
-root.title("IVyVI Game Launcher")
+root.title("Game Launcher")
 root.geometry("800x600")
 root.grid_columnconfigure(index=0, weight=1)
 root.grid_columnconfigure(index=2, weight=1)
 root.grid_rowconfigure(index=1, weight=1)
 
-
-# !!!GAME LISTS!!!
+# No DRM game list
 ndLabel = Label(root, text="No DRM").grid()
 ndScrolly = Scrollbar(root)
 ndScrolly.grid(column=1, row=1, sticky=NS + W)
@@ -39,6 +39,7 @@ noDrmList.grid(column=0, row=1, sticky=EW+NS,)
 ndScrolly.config(command=noDrmList.yview)
 ndScrollx.config(command=noDrmList.xview)
 
+# Steam game list
 stLabel = Label (root, text="Steam").grid(column=2, row=0)
 stScrolly = Scrollbar(root)
 stScrolly.grid(column=3, row=1, sticky=NS)
@@ -52,6 +53,8 @@ stScrollx.config(command=steamList.xview)
 
 # !!!FUNCTIONS!!!
 def gameUpdate():
+    """Update the game lists by clearing them and replacing them with the games
+    found in the database"""
     noDrmList.delete(0, END)
     steamList.delete(0, END)
     rows = db.execute("SELECT * FROM games ORDER BY LOWER(name)")
@@ -61,12 +64,15 @@ def gameUpdate():
             noDrmList.insert(END, game)
         elif i[1] == 'steam':
             steamList.insert(END, i[0])
+    # If there are no games in either list the run button is disabled
     if steamList.size() > 0 or noDrmList.size() > 0: runButton.config(state=NORMAL)
     else: runButton.config(state=DISABLED)
+    # Update the user information
     with open("user.json", 'w') as newUser:
         json.dump(users, newUser)
 
 def listEdit(command, list):
+    """Add or remove items from a given list"""
     if command == "add":
         path = filedialog.askdirectory()
         if path not in [i for i in list.get(0, END)]:
@@ -79,6 +85,7 @@ def listEdit(command, list):
         return True
 
 def gameDelete(listb):
+    """Remove games from one of the main lists and also the database"""
     select = listb.curselection()
     selget = listb.get(select[0], select[-1])
     for i in selget:
@@ -88,6 +95,7 @@ def gameDelete(listb):
     return True
 
 def errorMessage(parent, message):
+    """Generate an error message the user must interact with"""
     error = Toplevel(parent)
     error.grab_set()
     error.title("Uh oh!")
@@ -113,7 +121,7 @@ def scanWindow():
         # Add single file to list
         if type == 0:
             path = filedialog.askopenfilename()
-            if Path(path) not in [Path(i) for i in addList.get(0, END)]: addList.insert(END, path)
+            if Path(path) not in [Path(i) for i in addList.get(0, END)]: leaveList.insert(END, path)
         # Scan folder and add contents to list
         elif type == 1:
             path = filedialog.askdirectory()
@@ -123,6 +131,7 @@ def scanWindow():
 
         return True
     def listSwap(command):
+        """Move items from one list to another"""
         lists = (addList, leaveList) if command == "add" else (leaveList, addList)
         select = lists[1].curselection()
         for j in reversed(select):
@@ -142,7 +151,7 @@ def scanWindow():
         gameUpdate()
         return True
 
-    # !!!LIST!!!
+    # Found executables go here
     leaveScrolly = Scrollbar(noDrmFrame)
     leaveScrolly.grid(column=3, rowspan=2, sticky=NS)
     leaveScrollx = Scrollbar(noDrmFrame, orient=HORIZONTAL)
@@ -153,6 +162,7 @@ def scanWindow():
     leaveScrolly.config(command=leaveList.yview)
     leaveScrollx.config(command=leaveList.xview)
 
+    # Items in this list get added to main list on confirmation
     scrolly = Scrollbar(noDrmFrame)
     scrolly.grid(column=7, row=0, rowspan=2, sticky=NS)
     scrollx = Scrollbar(noDrmFrame, orient=HORIZONTAL)
@@ -162,6 +172,7 @@ def scanWindow():
     addList.grid(column=5, columnspan=2, row=0, rowspan=2, sticky=EW+NS,)
     scrolly.config(command=addList.yview)
     scrollx.config(command=addList.xview)
+
     # !!!BUTTONS!!!
     fileButton = Button(noDrmFrame, text="Select File", command=lambda: getList(0))
     fileButton.grid(column=0, row=0, sticky=N+EW)
@@ -179,11 +190,13 @@ def scanWindow():
     steamFrame.grid_columnconfigure(index=1, weight=1)
 
     def userAdd():
+        """Add user information for Steam"""
         user = Toplevel()
         user.title("Set Steam User")
         user.grab_set()
 
         def userOK():
+            """Add or edit new user information if previous password is entered"""
             if enterPrev is not None:
                 prev = enterPrev.get()
             else:
@@ -218,8 +231,8 @@ def scanWindow():
         clear.title("Remove Steam User Data")
         clear.grab_set()
 
-
         def userClear(service, unam):
+            """Clear all user information for Steam"""
             clearLogin(service, unam)
             users["steam"]["user"] = ""
             users["steam"]["path"] = ""
@@ -236,6 +249,7 @@ def scanWindow():
         noButton.grid(row=1, column=1)
 
     def steamAdd():
+        """Find Steam game information, and the folder containing Steam.exe"""
         sList = steamDirList.get(0,END)
         for i in steamSearch(sList):
             rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (i[0],))
@@ -289,10 +303,14 @@ def runGame(list):
     rows = db.execute("SELECT drm, pathid FROM games WHERE name=?", (runName,))
     gameInfo = rows.fetchone()
     if gameInfo[0] == "steam":
+            """Attempt to run steam through the command prompt, using login
+            and the app code for the selected game"""
             try:
                 if not users["steam"]["path"]:
+                    # Raise error if Steam.exe is not found
                     raise RuntimeError
                 elif not users["steam"]["user"]:
+                    # If there is no username, open the Steam login client
                     Popen([users["steam"]["path"], "-applaunch", gameInfo[1]], shell=True)
                 else:
                     Popen([users["steam"]["path"], "-login", users["steam"]["user"],
@@ -307,6 +325,7 @@ def runGame(list):
 
     elif gameInfo[0] == "none":
         try:
+            # Run a game with no DRM through the command prompt
             Popen(gameInfo[1], shell=True)
             return True
         except FileNotFoundError:
@@ -321,6 +340,8 @@ root.config(menu=menuBar)
 
 # !!!EVENT HANDLERS!!!
 def listSelect(event):
+    """Make sure the removal and run functions for the main lists use the right
+    list"""
     runButton.config(command=lambda:runGame(event.widget))
     mainRemButton.config(command=lambda:gameDelete(event.widget))
 def doubleClick(event):

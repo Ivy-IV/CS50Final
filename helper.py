@@ -12,8 +12,7 @@ def search(path):
     # Convert string to path object
     folder = Path(path)
     # Get list of every exe in the path folder + its subfolders
-    exeList = jeff.glob('**/*.exe')
-
+    exeList = folder.glob('**/*.exe')
     return exeList
 
 def steamSearch(dirPaths):
@@ -22,6 +21,7 @@ def steamSearch(dirPaths):
     for i in dirPaths:
         iPath = Path(i)
         appsPath = iPath.glob('steamapps/*.acf')
+        # Find files containing the game info
         for j in appsPath:
             with open(j) as k:
                 acfFile = ""
@@ -46,5 +46,6 @@ def setLogin(unam, pword, prev, serv, json):
         return "Old password given didn't match saved password!"
 
 def clearLogin(serv, unam):
+    """Clear password from the keyring for a given service"""
     keyring.delete_password(serv, unam)
     return True
