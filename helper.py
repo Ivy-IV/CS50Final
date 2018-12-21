@@ -31,9 +31,7 @@ def steamSearch(dirPaths):
                 while "name" not in acfFile:
                     acfFile = k.readline()
                 sName = acfFile.replace('\"name\"', '').strip('\n\t\" ')
-            if sAppID == "228980":
-                break
-            sL.append((sAppID, sName, 'steam',))
+            if sAppID != "228980": sL.append((sAppID, sName, 'steam',)) 
     return sL
 
 def setLogin(unam, pword, prev, serv, json):

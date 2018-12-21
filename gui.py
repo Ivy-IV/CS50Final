@@ -21,7 +21,7 @@ conn = connect('launcher.db')
 db = conn.cursor()
 
 root = Tk()
-root.title("Game Launcher")
+root.title("IVyVI Game Launcher")
 root.geometry("800x600")
 root.grid_columnconfigure(index=0, weight=1)
 root.grid_columnconfigure(index=2, weight=1)
@@ -120,7 +120,7 @@ def scanWindow():
     def getList(type):
         # Add single file to list
         if type == 0:
-            path = filedialog.askopenfilename()
+            path = filedialog.askopenfilename().replace('/', '\\')
             if Path(path) not in [Path(i) for i in addList.get(0, END)]: leaveList.insert(END, path)
         # Scan folder and add contents to list
         elif type == 1:
@@ -139,12 +139,11 @@ def scanWindow():
             lists[1].delete(j)
 
     def addNoDRM():
-        select = addList.curselection()
-        for i in select:
-            path = addList.get(i)
-            noDInfo = [Path(path).stem, path, 'none',]
-            rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (path,))
-            if path not in rows.fetchall():
+        path = addList.get(0, END)
+        for i in path:
+            noDInfo = [Path(i).stem, i, 'none',]
+            rows = db.execute("SELECT pathid FROM games WHERE pathid=?", (i,))
+            if i not in rows.fetchall():
                 rows = db.execute("INSERT OR REPLACE INTO games('name', 'pathid', drm) VALUES(?, ?, ?)",
                     noDInfo)
         conn.commit()
